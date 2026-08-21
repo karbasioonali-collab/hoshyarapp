@@ -1,0 +1,358 @@
+// اسکیمای دیتابیس هوشیار
+// اصل کلیدی: دسته‌بندی‌ها (Category) رکورد دیتابیسن نه هاردکد، و هر تغییر مالی
+// از سرویس مرکزی حسابداری (apps/backend/src/lib/ledger-service.ts) رد می‌شه.
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// شش سرشاخه‌ی ثابت صفحه‌ی «حساب و کتاب» (رنگ هرکدام در packages/shared ثابت شده)
+enum CategoryBranch {
+  INCOME
+  INSTALLMENT
+  EXPENSE
+  DEBT
+  RECEIVABLE
+  ASSET
+}
+
+enum TransactionStatus {
+  PAID
+  PENDING
+}
+
+enum TransactionSource {
+  MANUAL
+  VOICE
+  AUTO
+}
+
+enum PersonDirection {
+  DEBT
+  RECEIVABLE
+}
+
+enum PersonEntryStatus {
+  PENDING
+  SETTLED
+}
+
+enum VoiceInputType {
+  VOICE
+  TEXT
+}
+
+enum AdminRole {
+  SUPER_ADMIN
+  SUPPORT
+}
+
+model User {
+  id                  String    @id @default(cuid())
+  phone               String?   @unique
+  email               String?   @unique
+  passwordHash        String?
+  name                String?
+  avatarUrl           String?
+  onboardingCompleted Boolean   @default(false)
+  // تنظیمات آزاد کاربر (مثل بازه‌ی پیش‌فرض یادآوری‌ها)
+  settings            Json      @default("{}")
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  otpCodes             OtpCode[]
+  bankAccounts         BankAccount[]
+  categories           Category[]
+  transactions         Transaction[]
+  installmentPlans     InstallmentPlan[]
+  personLedgerEntries  PersonLedgerEntry[]
+  assets               Asset[]
+  events               Event[]
+  appointments         Appointment[]
+  reminders            Reminder[]
+  onboardingAnswer     OnboardingAnswer?
+  columnLabelOverrides ColumnLabelOverride[]
+  ledgerEvents         LedgerEvent[]
+  voiceInteractions    VoiceInteraction[]
+
+  @@map("users")
+}
+
+model OtpCode {
+  id         String    @id @default(cuid())
+  phone      String
+  code       String
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+  userId     String?
+  user       User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([phone])
+  @@map("otp_codes")
+}
+
+// کاربران پنل ادمین، کاملاً جدا از User مصرف‌کننده
+model AdminUser {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  name         String
+  role         AdminRole @default(SUPPORT)
+  createdAt    DateTime  @default(now())
+
+  @@map("admin_users")
+}
+
+model BankAccount {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  balance     Decimal  @default(0) @db.Decimal(18, 2)
+  description String?
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  transactions        Transaction[]
+  installmentPlans    InstallmentPlan[]
+  personLedgerEntries PersonLedgerEntry[]
+
+  @@index([userId])
+  @@map("bank_accounts")
+}
+
+// دسته‌بندی‌ها به‌صورت رکورد دیتابیس: userId=null یعنی پیش‌فرض سیستمی مشترک بین همه،
+// غیرنال یعنی دسته‌ی دلخواهی که همان کاربر اضافه کرده. parentId خودارجاع برای زیرشاخه‌های تودرتو
+// (مثل «مواد غذایی» -> «سوپر»)؛ افزودن دسته‌ی جدید فقط یک insert است، بدون تغییر کد.
+model Category {
+  id        String         @id @default(cuid())
+  branch    CategoryBranch
+  parentId  String?
+  parent    Category?      @relation("CategoryToParent", fields: [parentId], references: [id], onDelete: Cascade)
+  children  Category[]     @relation("CategoryToParent")
+  userId    String?
+  user      User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  sortOrder Int            @default(0)
+  createdAt DateTime       @default(now())
+
+  transactions Transaction[]
+
+  @@index([branch, parentId])
+  @@index([userId])
+  @@map("categories")
+}
+
+// لجر مرکزی: هر تراکنش مالی (درآمد یا هزینه) یک رکورد اینجاست.
+// اقساط/بدهی/طلب/دارایی به‌خاطر فیلدهای تخصصی‌شون جدول جدا دارن (پایین‌تر)،
+// ولی وقتی پرداخت می‌شن هم از طریق ledger-service یک Transaction لینک‌شده می‌سازن.
+model Transaction {
+  id            String            @id @default(cuid())
+  userId        String
+  user          User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  categoryId    String
+  category      Category          @relation(fields: [categoryId], references: [id])
+  bankAccountId String?
+  bankAccount   BankAccount?      @relation(fields: [bankAccountId], references: [id])
+  amount        Decimal           @db.Decimal(18, 2)
+  occurredOn    DateTime
+  description   String?
+  status        TransactionStatus @default(PAID)
+  source        TransactionSource @default(MANUAL)
+  // فیلدهای خاص هر زیرشاخه (مثل نام شرکت برای سود سهام) بدون نیاز به migration
+  metadata      Json              @default("{}")
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  installmentPayment InstallmentPayment?
+
+  @@index([userId, categoryId])
+  @@index([userId, occurredOn])
+  @@map("transactions")
+}
+
+model InstallmentPlan {
+  id            String       @id @default(cuid())
+  userId        String
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  description   String
+  totalAmount   Decimal      @db.Decimal(18, 2)
+  monthlyAmount Decimal      @db.Decimal(18, 2)
+  monthsCount   Int
+  payDay        Int
+  bankAccountId String?
+  bankAccount   BankAccount? @relation(fields: [bankAccountId], references: [id])
+  createdAt     DateTime     @default(now())
+
+  payments InstallmentPayment[]
+
+  @@index([userId])
+  @@map("installment_plans")
+}
+
+// وقتی کاربر می‌گه «قسط N تومن، M ماهه، روز D»، ledger-service به تعداد monthsCount
+// از این رکوردها می‌سازه. با «قسط رو دادم» رکورد paidAt می‌گیره و یک Transaction لینک می‌شه.
+model InstallmentPayment {
+  id            String       @id @default(cuid())
+  planId        String
+  plan          InstallmentPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  monthIndex    Int
+  dueJalaliYear Int
+  dueMonth      Int
+  dueDay        Int
+  amount        Decimal      @db.Decimal(18, 2)
+  paidAt        DateTime?
+  transactionId String?      @unique
+  transaction   Transaction? @relation(fields: [transactionId], references: [id])
+
+  @@index([planId])
+  @@map("installment_payments")
+}
+
+// بدهی به اشخاص و طلب از اشخاص در یک جدول یکپارچه (direction تفاوتشون رو مشخص می‌کنه)
+model PersonLedgerEntry {
+  id            String            @id @default(cuid())
+  userId        String
+  user          User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  direction     PersonDirection
+  description   String
+  personName    String
+  amount        Decimal           @db.Decimal(18, 2)
+  dueMonth      Int
+  dueDay        Int
+  status        PersonEntryStatus @default(PENDING)
+  settledAt     DateTime?
+  bankAccountId String?
+  bankAccount   BankAccount?      @relation(fields: [bankAccountId], references: [id])
+  createdAt     DateTime          @default(now())
+
+  @@index([userId, direction])
+  @@map("person_ledger_entries")
+}
+
+// واحد آزاد (تومان/ملک/طلا/...)
+model Asset {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  description String
+  amount      String
+  unit        String
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@map("assets")
+}
+
+// مناسبت‌ها (تولد، سالگرد و مشابه) - بدون سال، معمولاً سالانه تکرار می‌شن
+model Event {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  description String
+  jalaliMonth Int
+  jalaliDay   Int
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@map("events")
+}
+
+// جلسات و قرارها (کاری/شخصی)
+model Appointment {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  description String
+  jalaliYear  Int
+  jalaliMonth Int
+  jalaliDay   Int
+  time        String
+  location    String?
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@map("appointments")
+}
+
+model Reminder {
+  id              String    @id @default(cuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  description     String
+  jalaliYear      Int
+  jalaliMonth     Int
+  jalaliDay       Int
+  time            String
+  // اگه خالی باشه از تنظیمات پیش‌فرض کاربر (User.settings) استفاده می‌شه
+  leadTimeMinutes Int?
+  notifiedAt      DateTime?
+  createdAt       DateTime  @default(now())
+
+  @@index([userId])
+  @@map("reminders")
+}
+
+model OnboardingAnswer {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  monthlyIncome   Decimal? @db.Decimal(18, 2)
+  housingCost     Decimal? @db.Decimal(18, 2)
+  carCost         Decimal? @db.Decimal(18, 2)
+  otherFixedCosts Json     @default("[]")
+  completedAt     DateTime @default(now())
+
+  @@map("onboarding_answers")
+}
+
+// امکان تغییر نام ستون‌های جدول توسط کاربر، بدون نیاز به migration برای جدول‌های آینده
+model ColumnLabelOverride {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tableKey    String
+  columnKey   String
+  customLabel String
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, tableKey, columnKey])
+  @@map("column_label_overrides")
+}
+
+// لاگ توضیح خودکار سرویس مرکزی حسابداری («۲۰۰ هزار تومان از حساب ملی کم شد»)
+model LedgerEvent {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactionId String?
+  message       String
+  createdAt     DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@map("ledger_events")
+}
+
+// لاگ هر ورودی ویس/تایپ به AI برای دیباگ و بهبود تشخیص Intent
+model VoiceInteraction {
+  id          String         @id @default(cuid())
+  userId      String
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  inputType   VoiceInputType
+  rawText     String
+  intent      Json?
+  actionTaken Json?
+  pageContext String?
+  createdAt   DateTime       @default(now())
+
+  @@index([userId, createdAt])
+  @@map("voice_interactions")
+}
