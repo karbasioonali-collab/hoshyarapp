@@ -1,14 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ZodError, ZodSchema } from "zod";
+import { DomainError } from "@hoshyar/shared";
 import { getUserIdFromRequest } from "./auth";
 
-export class ApiError extends Error {
-  status: number;
-  constructor(message: string, status = 400) {
-    super(message);
-    this.status = status;
-  }
-}
+// همون خطایی که ledger-service (در packages/database) پرتاب می‌کنه - این‌جا فقط
+// alias می‌کنیم تا بقیه‌ی روت‌ها بدون تغییر با همون نام ApiError کار کنن
+export const ApiError = DomainError;
 
 export function jsonError(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status });

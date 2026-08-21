@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { installmentPlanInputSchema } from "@hoshyar/shared";
 import { prisma } from "@/lib/db";
 import { parseBody, requireUserId, withErrorHandling } from "@/lib/api-helpers";
-import { createInstallmentPlan } from "@/lib/ledger-service";
+import { createInstallmentPlan } from "@hoshyar/database";
 
 export const GET = withErrorHandling(async (request: NextRequest) => {
   const userId = await requireUserId(request);

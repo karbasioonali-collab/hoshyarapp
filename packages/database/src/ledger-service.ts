@@ -1,19 +1,14 @@
 // سرویس مرکزی حسابداری هوشیار.
 //
 // این تنها نقطه‌ی ورودیه که مجازه موجودی بانک، وضعیت اقساط، و وضعیت بدهی/طلب رو تغییر بده -
-// چه از مسیر دستی، چه از ویس، چه خودکار (مثل تولید اقساط ماهانه). هر عملیات:
+// چه از مسیر دستی، چه از ویس، چه خودکار (مثل تولید اقساط ماهانه)، و چه از پنل ادمین.
+// همینجا (نه در apps/backend) زندگی می‌کنه تا apps/admin هم دقیقاً از همین منطق استفاده کنه
+// و هیچ‌وقت مستقیم موجودی بانک رو دستکاری نکنه. هر عملیات:
 //   ۱) داخل یک prisma.$transaction اتمیک اجرا می‌شه (یا کامل انجام می‌شه یا هیچی).
 //   ۲) یک یا چند LedgerEvent با جمله‌ی فارسی‌ی ساده برمی‌گردونه که مستقیم به کاربر نشون داده می‌شه.
-import { Prisma, PrismaClient } from "@hoshyar/database";
-import {
-  addJalaliMonths,
-  formatTomanPhrase,
-  parseJalaliDateString,
-  toGregorian,
-  todayJalali,
-} from "@hoshyar/shared";
-import { prisma } from "./db";
-import { ApiError } from "./api-helpers";
+import { DomainError as ApiError, addJalaliMonths, formatTomanPhrase, parseJalaliDateString, toGregorian, todayJalali } from "@hoshyar/shared";
+import { Prisma, PrismaClient } from "../generated/client";
+import { prisma } from "./client";
 
 type Tx = Prisma.TransactionClient | PrismaClient;
 

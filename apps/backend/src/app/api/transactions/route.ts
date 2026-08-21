@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { transactionInputSchema } from "@hoshyar/shared";
 import { prisma } from "@/lib/db";
 import { parseBody, requireUserId, withErrorHandling } from "@/lib/api-helpers";
-import { recordTransaction } from "@/lib/ledger-service";
+import { recordTransaction } from "@hoshyar/database";
 
 export const GET = withErrorHandling(async (request: NextRequest) => {
   const userId = await requireUserId(request);

@@ -15,7 +15,7 @@ import {
   createInstallmentPlan,
   payInstallmentPayment,
   recordTransaction,
-} from "@/lib/ledger-service";
+} from "@hoshyar/database";
 
 async function buildContext(userId: string) {
   const [bankAccounts, categories, plans] = await Promise.all([

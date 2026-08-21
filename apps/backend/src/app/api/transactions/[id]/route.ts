@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { transactionUpdateSchema } from "@hoshyar/shared";
 import { parseBody, requireUserId, withErrorHandling } from "@/lib/api-helpers";
-import { deleteTransaction, updateTransaction } from "@/lib/ledger-service";
+import { deleteTransaction, updateTransaction } from "@hoshyar/database";
 
 export const PATCH = withErrorHandling(async (request: NextRequest, { params }) => {
   const userId = await requireUserId(request);

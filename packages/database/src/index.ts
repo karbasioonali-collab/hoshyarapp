@@ -1,18 +1,3 @@
-import { PrismaClient } from "../generated/client";
-
-declare global {
-  // eslint-disable-next-line no-var
-  var __hoshyarPrisma: PrismaClient | undefined;
-}
-
-export const prisma =
-  globalThis.__hoshyarPrisma ??
-  new PrismaClient({
-    log: process.env.NODE_ENV === "development" ? ["warn", "error"] : ["error"],
-  });
-
-if (process.env.NODE_ENV !== "production") {
-  globalThis.__hoshyarPrisma = prisma;
-}
-
+export * from "./client";
 export * from "../generated/client";
+export * from "./ledger-service";

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUserId, withErrorHandling } from "@/lib/api-helpers";
-import { payInstallmentPayment } from "@/lib/ledger-service";
+import { payInstallmentPayment } from "@hoshyar/database";
 
 // وقتی کاربر می‌گه «قسط رو دادم»: پرداخت‌شده علامت می‌خوره، از موجودی بانک و از
 // کل بدهی باقی‌مونده (که از تجمیع قسط‌های پرداخت‌نشده محاسبه می‌شه) کم می‌شه
