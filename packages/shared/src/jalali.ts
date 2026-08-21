@@ -139,3 +139,25 @@ export const JALALI_MONTH_NAMES = [
 export function formatJalali(jy: number, jm: number, jd: number): string {
   return `${jd} ${JALALI_MONTH_NAMES[jm - 1]} ${jy}`;
 }
+
+/** "1405-05-30" -> {jy,jm,jd} */
+export function parseJalaliDateString(value: string): JalaliDate {
+  const [jy, jm, jd] = value.split("-").map((part) => parseInt(part, 10));
+  if (!jy || !jm || !jd) {
+    throw new Error(`تاریخ شمسی نامعتبر: ${value}`);
+  }
+  return { jy, jm, jd };
+}
+
+export function todayJalali(): JalaliDate {
+  return toJalali(new Date());
+}
+
+/** ماه‌ها رو به یک تاریخ شمسی اضافه می‌کنه (برای زمان‌بندی اقساط)، با wrap سال و clamp روز */
+export function addJalaliMonths(jy: number, jm: number, jd: number, monthsToAdd: number): JalaliDate {
+  const totalMonths = jy * 12 + (jm - 1) + monthsToAdd;
+  const newJy = Math.floor(totalMonths / 12);
+  const newJm = (totalMonths % 12) + 1;
+  const maxDay = jalaaliMonthLength(newJy, newJm);
+  return { jy: newJy, jm: newJm, jd: Math.min(jd, maxDay) };
+}

@@ -161,7 +161,7 @@ model Transaction {
   categoryId    String
   category      Category          @relation(fields: [categoryId], references: [id])
   bankAccountId String?
-  bankAccount   BankAccount?      @relation(fields: [bankAccountId], references: [id])
+  bankAccount   BankAccount?      @relation(fields: [bankAccountId], references: [id], onDelete: SetNull)
   amount        Decimal           @db.Decimal(18, 2)
   occurredOn    DateTime
   description   String?
@@ -189,7 +189,7 @@ model InstallmentPlan {
   monthsCount   Int
   payDay        Int
   bankAccountId String?
-  bankAccount   BankAccount? @relation(fields: [bankAccountId], references: [id])
+  bankAccount   BankAccount? @relation(fields: [bankAccountId], references: [id], onDelete: SetNull)
   createdAt     DateTime     @default(now())
 
   payments InstallmentPayment[]
@@ -231,7 +231,7 @@ model PersonLedgerEntry {
   status        PersonEntryStatus @default(PENDING)
   settledAt     DateTime?
   bankAccountId String?
-  bankAccount   BankAccount?      @relation(fields: [bankAccountId], references: [id])
+  bankAccount   BankAccount?      @relation(fields: [bankAccountId], references: [id], onDelete: SetNull)
   createdAt     DateTime          @default(now())
 
   @@index([userId, direction])
