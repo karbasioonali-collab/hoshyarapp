@@ -115,6 +115,68 @@ export const onboardingInputSchema = z.object({
     .optional(),
 });
 
+// ---------- هوش مصنوعی (ویس/تایپ) ----------
+export const transcribeRequestSchema = z.object({
+  audioBase64: z.string().min(1),
+  mimeType: z.string().min(1),
+});
+
+export const speakRequestSchema = z.object({
+  text: z.string().min(1),
+});
+
+export const voiceIntentRequestSchema = z.object({
+  text: z.string().min(1),
+  inputType: z.enum(["VOICE", "TEXT"]),
+  pageContext: z.string().optional(),
+  wantsAudio: z.boolean().optional(),
+});
+
+export const consultRequestSchema = z.object({
+  text: z.string().min(1),
+  inputType: z.enum(["VOICE", "TEXT"]),
+  wantsAudio: z.boolean().optional(),
+});
+
+// برای اعتبارسنجی خروجی JSON مدل زبانی، قبل از اجرای هر اقدامی روی دیتابیس
+export const voiceActionSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("add_transaction"),
+    branch: z.enum(CATEGORY_BRANCHES),
+    categoryName: z.string().min(1),
+    amount: z.number().positive(),
+    bankAccountName: z.string().optional(),
+    description: z.string().optional(),
+    occurredOnJalali: z.string().optional(),
+  }),
+  z.object({
+    type: z.literal("pay_installment"),
+    installmentDescription: z.string().min(1),
+  }),
+  z.object({
+    type: z.literal("create_installment"),
+    description: z.string().min(1),
+    totalAmount: z.number().positive(),
+    monthsCount: z.number().int().min(1).max(120),
+    payDay: z.number().int().min(1).max(31),
+    bankAccountName: z.string().optional(),
+  }),
+  z.object({
+    type: z.literal("navigate"),
+    path: z.string().min(1),
+  }),
+  z.object({
+    type: z.literal("ask_clarification"),
+    question: z.string().min(1),
+  }),
+]);
+
+export const aiIntentOutputSchema = z.object({
+  message: z.string().min(1),
+  action: voiceActionSchema,
+});
+export type AiIntentOutput = z.infer<typeof aiIntentOutputSchema>;
+
 // ---------- نام‌گذاری دلخواه ستون‌ها ----------
 export const columnLabelOverrideInputSchema = z.object({
   tableKey: z.string().min(1),

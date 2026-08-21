@@ -60,4 +60,8 @@ export interface VoiceIntentResponse {
   message: string;
   action: VoiceAction;
   audioBase64?: string;
+  /** اگه اقدام باعث ثبت چیزی شد، لیست جمله‌های توضیح سرویس مرکزی حسابداری */
+  ledgerMessages?: string[];
+  /** مقصد ناوبری پیشنهادی برای اپ موبایل (اگه لازم باشه صفحه‌ای باز بشه) */
+  navigateTo?: { branch?: string; categoryId?: string; path?: string };
 }
