@@ -1,0 +1,25 @@
+{
+  "expo": {
+    "name": "هوشیار",
+    "slug": "hoshyar",
+    "scheme": "hoshyar",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#0a1a3f"
+    },
+    "android": {
+      "package": "ir.hoshyarapp.mobile",
+      "adaptiveIcon": {
+        "backgroundColor": "#0a1a3f"
+      }
+    },
+    "plugins": ["expo-router"],
+    "extra": {
+      "router": {
+        "origin": false
+      }
+    }
+  }
+}

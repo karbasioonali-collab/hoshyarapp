@@ -19,5 +19,10 @@
   },
   "engines": {
     "node": ">=20"
+  },
+  "overrides": {
+    "react-native": "0.74.5",
+    "react": "18.2.0",
+    "react-native-reanimated": "~3.10.1"
   }
 }

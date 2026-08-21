@@ -3,12 +3,14 @@ import { CATEGORY_BRANCHES } from "@hoshyar/shared";
 import { prisma } from "@/lib/db";
 import { ApiError, requireUserId, withErrorHandling } from "@/lib/api-helpers";
 
-// نمودار مقایسه‌ای صفحه‌ی والد (مثلاً «هزینه‌های جاری»): مجموع هر زیرشاخه‌ی سطح اول
-// (شامل مجموع زیرشاخه‌های تودرتوش، مثل «مواد غذایی» که شامل «سوپر» و ... هم می‌شه)
+// نمودار مقایسه‌ای صفحه‌ی والد: مجموع هر زیرشاخه‌ی مستقیمِ parentId (یا سطح اول اگه
+// parentId نداده بشه)، شامل مجموع زیرشاخه‌های تودرتوی خودش هم می‌شه
+// (مثلاً «مواد غذایی» شامل «سوپر» و ... هم هست)
 export const GET = withErrorHandling(async (request: NextRequest) => {
   const userId = await requireUserId(request);
   const { searchParams } = new URL(request.url);
   const branch = searchParams.get("branch");
+  const parentId = searchParams.get("parentId");
   const months = Number(searchParams.get("months") ?? 3);
 
   if (!branch || !CATEGORY_BRANCHES.includes(branch as (typeof CATEGORY_BRANCHES)[number])) {
@@ -20,15 +22,18 @@ export const GET = withErrorHandling(async (request: NextRequest) => {
   });
   const categoryById = new Map(categories.map((c) => [c.id, c]));
 
-  function topLevelAncestorId(categoryId: string): string {
+  // بالاترین جدِ یک دسته که مستقیماً زیر groupParentId (یا ریشه) قرار داره
+  function groupAncestorId(categoryId: string): string {
     let current = categoryById.get(categoryId);
-    while (current?.parentId) {
+    while (current && current.parentId && current.parentId !== parentId) {
       const parent = categoryById.get(current.parentId);
       if (!parent) break;
       current = parent;
     }
     return current?.id ?? categoryId;
   }
+
+  const groupCategories = categories.filter((c) => (parentId ? c.parentId === parentId : !c.parentId));
 
   const since = new Date(Date.now() - months * 30 * 24 * 60 * 60 * 1000);
   const transactions = await prisma.transaction.findMany({
@@ -37,16 +42,17 @@ export const GET = withErrorHandling(async (request: NextRequest) => {
   });
 
   const totals = new Map<string, number>();
-  for (const category of categories.filter((c) => !c.parentId)) {
+  for (const category of groupCategories) {
     totals.set(category.id, 0);
   }
   for (const tx of transactions) {
-    const topId = topLevelAncestorId(tx.categoryId);
-    totals.set(topId, (totals.get(topId) ?? 0) + Number(tx.amount));
+    const groupId = groupAncestorId(tx.categoryId);
+    if (totals.has(groupId)) {
+      totals.set(groupId, (totals.get(groupId) ?? 0) + Number(tx.amount));
+    }
   }
 
-  const result = categories
-    .filter((c) => !c.parentId)
+  const result = groupCategories
     .sort((a, b) => a.sortOrder - b.sortOrder)
     .map((c) => ({ categoryId: c.id, name: c.name, total: totals.get(c.id) ?? 0 }));
 

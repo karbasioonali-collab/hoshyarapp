@@ -177,6 +177,12 @@ export const aiIntentOutputSchema = z.object({
 });
 export type AiIntentOutput = z.infer<typeof aiIntentOutputSchema>;
 
+// ---------- پروفایل و تنظیمات کاربر ----------
+export const updateProfileSchema = z.object({
+  name: z.string().min(1).optional(),
+  settings: z.record(z.any()).optional(),
+});
+
 // ---------- نام‌گذاری دلخواه ستون‌ها ----------
 export const columnLabelOverrideInputSchema = z.object({
   tableKey: z.string().min(1),
